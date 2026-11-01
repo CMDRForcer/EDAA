@@ -1091,9 +1091,14 @@ namespace edaa
                 variant = s.config.fg_factory;
             }
 
+            // The runtime ReShade adds on our D3D12 swap chain presents too: ignore it.
+            if (runtime->get_device()->get_api() != device_api::d3d11) {
+                return;
+            }
+
             const std::lock_guard<std::mutex> lock(presenter_mutex);
 
-            if (!enabled || p.failed || runtime->get_device()->get_api() != device_api::d3d11) {
+            if (!enabled || p.failed) {
                 inputs_wanted = false;
                 return;
             }
