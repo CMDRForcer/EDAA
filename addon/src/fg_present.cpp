@@ -85,6 +85,7 @@ namespace edaa
             ComPtr<ID3D12Resource> depth12, motion12;
             fg::frame_inputs inputs;
             bool inputs_fresh = false; // captured since the last present
+            uint32_t stale_frames = 1000; // presents since the last capture
             bool sl_on = false; // Streamline loaded, D3D12 objects are its proxies
         };
 
@@ -988,10 +989,15 @@ namespace edaa
             if (p.sl_on) {
                 sl_begin_frame();
                 sl_end_simulation();
-                const bool fresh = generate && p.inputs_fresh && sl_api.token != nullptr && p.depth12 && p.motion12;
-                sl_options(fresh);
+                // Some frames have no resolve (menus, loading): keep DLSS-G on with the
+                // last inputs (switching it off and on reallocates it, a long stall),
+                // off only after a while without any.
+                p.stale_frames = p.inputs_fresh ? 0 : p.stale_frames + 1;
+                const bool on = generate && sl_api.token != nullptr && p.depth12 && p.motion12 && p.inputs.render_w > 0 && p.stale_frames < 120;
+                sl_options(on);
 
-                if (fresh) {
+                if (on) {
+                    p.inputs.reset = p.inputs.reset || p.stale_frames > 0;
                     sl::Resource depth(sl::ResourceType::eTex2d, p.depth12.Get(), nullptr, nullptr, static_cast<uint32_t>(D3D12_RESOURCE_STATE_COMMON));
                     sl::Resource motion(sl::ResourceType::eTex2d, p.motion12.Get(), nullptr, nullptr, static_cast<uint32_t>(D3D12_RESOURCE_STATE_COMMON));
                     sl::Extent extent;
