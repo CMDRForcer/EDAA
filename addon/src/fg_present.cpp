@@ -577,9 +577,9 @@ namespace edaa
             }
 
             char msg[256];
-            snprintf(msg, sizeof(msg), "EDAA FG: DLSS-G state at frame %llu: status 0x%X, frames presented %u, VRAM %llu MB, min size %u",
+            snprintf(msg, sizeof(msg), "EDAA FG: DLSS-G state at frame %llu: status 0x%X, frames presented %u, frames without new inputs %u, reset %d, focus %d",
                 static_cast<unsigned long long>(p.frames), static_cast<unsigned>(st.status), st.numFramesActuallyPresented,
-                static_cast<unsigned long long>(st.estimatedVRAMUsageInBytes >> 20), st.minWidthOrHeight);
+                p.stale_frames, p.inputs.reset ? 1 : 0, GetForegroundWindow() == GetAncestor(p.parent, GA_ROOT) ? 1 : 0);
             log_info(msg);
         }
 #endif
