@@ -49,7 +49,7 @@ jobs:
           Copy-Item build/Release/EDAA.addon64 out/
           New-Item -ItemType Directory -Force out/streamline | Out-Null
           foreach ($f in "sl.interposer.dll","sl.common.dll","sl.dlss_g.dll","sl.reflex.dll","sl.pcl.dll","nvngx_dlssg.dll") {
-            Copy-Item "third_party/streamline/bin/x64/$f" out/streamline/
+            Copy-Item "build/Release/$f" out/streamline/
           }
           Set-Location out
           git init -q

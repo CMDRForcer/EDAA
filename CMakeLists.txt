@@ -135,6 +135,11 @@ set(SL_DIR ${CMAKE_SOURCE_DIR}/third_party/streamline)
 if(EDAA_WITH_STREAMLINE AND EXISTS ${SL_DIR}/include/sl_dlss_g.h)
 	target_include_directories(edaa SYSTEM PRIVATE ${SL_DIR}/include)
 	target_compile_definitions(edaa PRIVATE EDAA_SL=1)
+	# Production Streamline DLLs and the DLSS-G library next to EDAA.addon64.
+	foreach(SL_DLL sl.interposer.dll sl.common.dll sl.dlss_g.dll sl.reflex.dll sl.pcl.dll nvngx_dlssg.dll)
+		add_custom_command(TARGET edaa POST_BUILD
+			COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SL_DIR}/bin/x64/${SL_DLL} $<TARGET_FILE_DIR:edaa>)
+	endforeach()
 else()
 	target_compile_definitions(edaa PRIVATE EDAA_SL=0)
 	message(STATUS "Building without Streamline (SDK not in third_party/streamline)")
