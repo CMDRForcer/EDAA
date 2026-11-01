@@ -29,6 +29,7 @@ namespace edaa::fg
         bool background = false; // the game is not the foreground window (DLSS-G pauses)
         bool waiting = false; // no scene from EDAA (menus, maps, loading): DLSS-G pauses
         bool reflex = false;
+        bool hud_protected = false; // the HUD mask was applied to the last frame's motion vectors
         float real_fps = 0, shown_fps = 0;
         unsigned dlssg_status = 0; // sl::DLSSGStatus flags (0 = ok)
         const char* error = nullptr; // why the D3D12 path stopped
@@ -42,4 +43,8 @@ namespace edaa::fg
     // Called from resolve() on the game's immediate context: depth is R32_FLOAT,
     // motion the EDAA motion vectors (previous UV - current UV, without jitter).
     void capture(ID3D11DeviceContext* ctx, ID3D11Texture2D* depth, ID3D11Texture2D* motion, const frame_inputs& in);
+
+    // passes.cpp, at Present: rewrite 'target' (the shared motion vectors) with
+    // the cockpit HUD standing still, from this frame's HUD mask. False if none.
+    bool apply_hud_motion(ID3D11DeviceContext* ctx, ID3D11Texture2D* target);
 }

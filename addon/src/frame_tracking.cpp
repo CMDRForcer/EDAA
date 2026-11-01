@@ -722,7 +722,7 @@ namespace edaa
         // the last thing drawn into the scene: time to build the HUD mask.
         void check_hud_mask(command_list* cmd_list, context_state* ctx)
         {
-            if (ctx == nullptr || !ctx->resolve_ps || !state().upscale_pending) {
+            if (ctx == nullptr || !ctx->resolve_ps || !(state().upscale_pending || state().fg_hud_pending)) {
                 return;
             }
 
@@ -730,7 +730,7 @@ namespace edaa
                 addon_state& s = state();
                 const std::lock_guard<std::recursive_mutex> lock(s.mutex);
 
-                if (!s.upscale_pending || s.hud_mask_done || !s.config.upscale_hud_mask) {
+                if (!(s.upscale_pending ? s.config.upscale_hud_mask : s.fg_hud_pending.load()) || s.hud_mask_done) {
                     return;
                 }
 
@@ -745,7 +745,7 @@ namespace edaa
         // resolve has completed, the HUD mask snapshot is taken again.
         void check_hud_snapshot(command_list* cmd_list, context_state* ctx, bool fullscreen)
         {
-            if (ctx == nullptr || !state().upscale_pending) {
+            if (ctx == nullptr || !(state().upscale_pending || state().fg_hud_pending)) {
                 return;
             }
 
@@ -754,7 +754,7 @@ namespace edaa
                 addon_state& s = state();
                 const std::lock_guard<std::recursive_mutex> lock(s.mutex);
 
-                if (!s.upscale_pending || s.hud_mask_done || !s.config.upscale_hud_mask) {
+                if (!(s.upscale_pending ? s.config.upscale_hud_mask : s.fg_hud_pending.load()) || s.hud_mask_done) {
                     return;
                 }
 
@@ -999,6 +999,7 @@ namespace edaa
         const bool upscaled = s.upscale_pending; // this frame ran for the upscaler
         s.upscale_pending = false;
         s.upscale_attempted = false;
+        s.fg_hud_pending = false;
         s.ldr_image = 0;
         s.hud_mask_done = false;
         s.hud_snapshot_stale = false;

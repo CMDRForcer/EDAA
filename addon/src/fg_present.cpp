@@ -94,6 +94,7 @@ namespace edaa
             unsigned dlssg_status = 0;
             bool focus = true;
             const char* error = nullptr;
+            bool hud_protected = false;
             bool sl_on = false; // Streamline loaded, D3D12 objects are its proxies
         };
 
@@ -922,7 +923,7 @@ namespace edaa
             desc.ArraySize = 1;
             desc.Format = src.Format;
             desc.SampleDesc.Count = 1;
-            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+            desc.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET; // motion: HUD protection draws into it
             desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_NTHANDLE | D3D11_RESOURCE_MISC_SHARED;
 
             if (fail("cannot create a shared frame generation input", p.device11_5->CreateTexture2D(&desc, nullptr, &t11))) {
@@ -1131,7 +1132,7 @@ namespace edaa
 
         void on_reshade_present_fg(effect_runtime* runtime)
         {
-            bool enabled, generate;
+            bool enabled, generate, hud_protect;
             int variant, fps_limit;
             {
                 addon_state& s = state();
@@ -1140,6 +1141,7 @@ namespace edaa
                 generate = s.config.fg_generate;
                 variant = s.config.fg_factory;
                 fps_limit = s.config.fg_fps_limit;
+                hud_protect = s.config.fg_hud_protect;
             }
 
             // The runtime ReShade adds on our D3D12 swap chain presents too: ignore it.
@@ -1147,7 +1149,31 @@ namespace edaa
                 return;
             }
 
+            // HUD protection: the cockpit HUD stands still in the motion vectors of
+            // this frame (before the shared fence is signalled in present_frame).
+            // passes.cpp takes gpu_mutex: not with presenter_mutex held.
+            ComPtr<ID3D11Texture2D> hud_target;
+
+            if (enabled && generate && hud_protect) {
+                const std::lock_guard<std::mutex> lock(presenter_mutex);
+
+                if (p.sl_on && !p.failed && p.inputs_fresh) {
+                    hud_target = p.motion11;
+                }
+            }
+
+            bool hud_done = false;
+
+            if (hud_target) {
+                auto* const ctx = reinterpret_cast<ID3D11DeviceContext*>(runtime->get_command_queue()->get_immediate_command_list()->get_native());
+                hud_done = fg::apply_hud_motion(ctx, hud_target.Get());
+            }
+
             const std::lock_guard<std::mutex> lock(presenter_mutex);
+
+            if (hud_target || !hud_protect || !generate) {
+                p.hud_protected = hud_done;
+            }
 
             if (!enabled || p.failed) {
                 inputs_wanted = false;
@@ -1260,6 +1286,7 @@ namespace edaa
 #endif
         st.shown_fps = p.real_fps * static_cast<float>(st.generating ? p.presented : 1);
         st.dlssg_status = p.dlssg_status;
+        st.hud_protected = p.hud_protected;
         st.error = p.error;
         return st;
     }

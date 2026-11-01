@@ -52,6 +52,7 @@ namespace edaa
         bool upscale_mip_bias = true; // upscaling: scene textures sampled with the display resolution mips (mip_bias.cpp)
         int fg_factory = 1; // frame generation: 0 = system dxgi.dll (crashes with ReShade), 1 = ReShade's dxgi.dll (fg_present.cpp)
         int fg_fps_limit = 140; // frame generation: Reflex limit of the displayed frames (real + generated), 0 = none
+        bool fg_hud_protect = true; // frame generation: the cockpit HUD stands still in the generated frames (no smearing)
         bool fg_generate = false; // DLSS Frame Generation through Streamline (fg_present.cpp)
         bool fg_present_test = false; // present through a D3D12 swap chain (needed by fg_generate, read at game start)
         int dlss_preset = 0; // DLSS model: 0 = NVIDIA's default (K for DLAA), else NVSDK_NGX_DLSS_Hint_Render_Preset (J 10, K 11, L 12, M 13)
@@ -219,6 +220,7 @@ namespace edaa
         std::atomic<bool> upscale_pending = false; // the resolve ran for upscaling: replace the game's upscale draw
         bool upscale_attempted = false; // first draw into a display-size target after the resolve seen
         bool hud_snapshot_stale = false; // a fullscreen pass was drawn into the scene after the resolve
+        std::atomic<bool> fg_hud_pending = false; // the resolve ran for frame generation with the HUD mask: build it this frame
         bool hud_mask_done = false; // HUD mask built this frame (at the bloom, or at the upscale without bloom)
         uint64_t ldr_image = 0; // last render-size R8G8B8A8 target drawn after the resolve (tonemap / SMAA output)
         const char* upscale_status = "off";

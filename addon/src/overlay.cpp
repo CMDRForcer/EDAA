@@ -473,6 +473,7 @@ namespace edaa
                 s.config.fg_present_test = true; // the D3D12 swap chain it needs
             }
 
+            edit(ImGui::Checkbox("Keep the cockpit HUD steady (no smearing in generated frames)", &s.config.fg_hud_protect));
             ImGui::SetNextItemWidth(ImGui::GetFontSize() * 12);
             edit(ImGui::SliderInt("Frame limit (displayed FPS, 0 = off)", &s.config.fg_fps_limit, 0, 360));
             ImGui::TextDisabled("Use this limit only (no external limiter): set it just below the refresh rate, e.g. 140 at 144 Hz.");
@@ -514,6 +515,10 @@ namespace edaa
             }
 
             ImGui::Text("Reflex low latency: %s", st.reflex ? "on" : "off");
+
+            if (s.config.fg_hud_protect && st.generating) {
+                ImGui::Text("HUD protection: %s", st.hud_protected ? "active" : "no HUD found this frame");
+            }
 
             if (st.dlssg_status != 0) {
                 ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f), "DLSS-G reports problem flags 0x%X (see ReShade.log)", st.dlssg_status);
