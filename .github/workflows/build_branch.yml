@@ -1,0 +1,35 @@
+# Fork only: build every push to a feature/ or cmdr/ branch and keep the add-on
+# as a workflow artifact (no release, no tag needed).
+name: Build branch
+
+on:
+  push:
+    branches:
+      - 'feature/**'
+      - 'cmdr/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Build add-on
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}" -replace '[^A-Za-z0-9.-]', '-'
+          $v = "0.4.1-$v-$("${{ github.sha }}".Substring(0,7))"
+          cmake -S . -B build -G "Visual Studio 17 2022" -A x64 "-DEDAA_VERSION=$v"
+          cmake --build build --config Release
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EDAA-addon
+          path: |
+            build/Release/EDAA.addon64
+            build/Release/nvngx_dlss.dll
+          retention-days: 14
