@@ -50,6 +50,7 @@ namespace edaa
         bool upscale_hud_mask = true; // upscaling: the cockpit HUD uses the current frame only (no trails)
         float upscale_sharpness = 0.5f; // EDAA TAA upscaling: contrast-adaptive sharpening, 0..1
         bool upscale_mip_bias = true; // upscaling: scene textures sampled with the display resolution mips (mip_bias.cpp)
+        int fg_factory = 0; // experimental: 0 = system dxgi.dll, 1 = ReShade's dxgi.dll (fg_present.cpp)
         bool fg_present_test = false; // experimental: present through a D3D12 swap chain (fg_present.cpp), set in ReShade.ini only
         int dlss_preset = 0; // DLSS model: 0 = NVIDIA's default (K for DLAA), else NVSDK_NGX_DLSS_Hint_Render_Preset (J 10, K 11, L 12, M 13)
         float mip_bias_extra = 0; // developer, not saved: added to the upscaling mip bias

@@ -59,6 +59,7 @@ namespace edaa
             EDAA_FIELD(upscale_sharpness, real),
             EDAA_FIELD(dlss_preset, integer),
             EDAA_FIELD(fg_present_test, boolean),
+            EDAA_FIELD(fg_factory, integer),
         };
 #undef EDAA_FIELD
 

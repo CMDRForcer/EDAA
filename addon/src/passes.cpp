@@ -1007,6 +1007,11 @@ namespace edaa
         void on_present(command_queue* queue, swapchain* swapchain, const rect*, const rect*, uint32_t, const rect*)
         {
             EDAA_PROFILE(present);
+
+            if (!is_game_device(queue->get_device())) {
+                return; // e.g. the D3D12 swap chain of the frame generation test
+            }
+
             addon_state& s = state();
             const resource back_buffer = swapchain->get_current_back_buffer();
             const resource_desc bb_desc = queue->get_device()->get_resource_desc(back_buffer);

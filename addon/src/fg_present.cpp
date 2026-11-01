@@ -78,6 +78,17 @@ namespace edaa
         }
 
 
+        // Diagnostics: each step of the first frames, to find where a crash happens.
+        void step(const char* name)
+        {
+            if (p.frames < 3) {
+                char msg[128];
+                snprintf(msg, sizeof(msg), "EDAA FG test: frame %llu, %s", static_cast<unsigned long long>(p.frames), name);
+                log_info(msg);
+            }
+        }
+
+
         bool fail(const char* what, HRESULT hr)
         {
             if (SUCCEEDED(hr)) {
@@ -152,12 +163,19 @@ namespace edaa
 
 
         // System dxgi.dll: ReShade's proxy would add a second effect runtime.
-        bool create_factory()
+        bool create_factory(int variant)
         {
             wchar_t path[MAX_PATH];
             const UINT len = GetSystemDirectoryW(path, MAX_PATH);
             const std::wstring dll = std::wstring(path, len) + L"\\dxgi.dll";
-            const HMODULE module = LoadLibraryExW(dll.c_str(), nullptr, 0);
+            // 1: the dxgi.dll the game loaded (ReShade's proxy): ReShade wraps the swap
+            // chain like the queue, and gets an effect runtime for it (effects disabled there).
+            const HMODULE module = variant == 1 ? GetModuleHandleW(L"dxgi.dll") : LoadLibraryExW(dll.c_str(), nullptr, 0);
+            {
+                char msg[96];
+                snprintf(msg, sizeof(msg), "EDAA FG test: DXGI factory from %s dxgi.dll", variant == 1 ? "the game's (ReShade)" : "the system");
+                log_info(msg);
+            }
             using create_t = HRESULT(WINAPI*)(UINT, REFIID, void**);
             const auto create = module != nullptr ? reinterpret_cast<create_t>(GetProcAddress(module, "CreateDXGIFactory2")) : nullptr;
 
@@ -356,7 +374,7 @@ namespace edaa
         }
 
 
-        void present_frame(effect_runtime* runtime)
+        void present_frame(effect_runtime* runtime, int variant)
         {
             auto* const device = reinterpret_cast<ID3D11Device*>(runtime->get_device()->get_native());
             auto* const ctx = reinterpret_cast<ID3D11DeviceContext*>(runtime->get_command_queue()->get_immediate_command_list()->get_native());
@@ -376,7 +394,7 @@ namespace edaa
             if (p.device12 == nullptr) {
                 p.parent = static_cast<HWND>(runtime->get_hwnd());
 
-                if (!create_factory() || !create_device(device) || !create_child(p.parent, bb.Width, bb.Height)) {
+                if (!create_factory(variant) || !create_device(device) || !create_child(p.parent, bb.Width, bb.Height)) {
                     return;
                 }
             }
@@ -385,6 +403,7 @@ namespace edaa
                 return;
             }
 
+            step("resources ready");
             ComPtr<ID3D11DeviceContext4> ctx4;
 
             if (fail("Windows 10 1703 or newer needed (ID3D11DeviceContext4)", ctx->QueryInterface(IID_PPV_ARGS(&ctx4)))) {
@@ -397,16 +416,19 @@ namespace edaa
             const uint64_t ready = ++p.fence_value;
             ctx4->Signal(p.fence11.Get(), ready);
             ctx->Flush();
+            step("D3D11 copy and signal submitted");
 
             // D3D12: wait for the copy, copy into the swap chain's buffer, present.
             const UINT index = p.swapchain->GetCurrentBackBufferIndex();
             wait_for(p.allocator_values[index]);
+            step("back buffer index read, allocator free");
             ComPtr<ID3D12Resource> target;
 
             if (fail("cannot get the D3D12 back buffer", p.swapchain->GetBuffer(index, IID_PPV_ARGS(&target)))) {
                 return;
             }
 
+            step("D3D12 back buffer obtained");
             p.allocators[index]->Reset();
             p.list->Reset(p.allocators[index].Get(), nullptr);
 
@@ -423,6 +445,7 @@ namespace edaa
             barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
             p.list->ResourceBarrier(1, &barrier);
             p.list->Close();
+            step("D3D12 command list recorded");
 
             p.queue->Wait(p.fence12.Get(), ready);
             ID3D12CommandList* const lists[] = { p.list.Get() };
@@ -431,6 +454,7 @@ namespace edaa
             p.queue->Signal(p.fence12.Get(), done);
             p.copy_done = done;
             p.allocator_values[index] = done;
+            step("D3D12 work submitted, presenting");
 
             const HRESULT presented = p.swapchain->Present(0, p.tearing ? DXGI_PRESENT_ALLOW_TEARING : 0);
 
@@ -448,10 +472,12 @@ namespace edaa
         void on_reshade_present_fg(effect_runtime* runtime)
         {
             bool enabled;
+            int variant;
             {
                 addon_state& s = state();
                 const std::lock_guard<std::recursive_mutex> lock(s.mutex);
                 enabled = s.config.fg_present_test;
+                variant = s.config.fg_factory;
             }
 
             const std::lock_guard<std::mutex> lock(presenter_mutex);
@@ -461,7 +487,7 @@ namespace edaa
             }
 
             try {
-                present_frame(runtime);
+                present_frame(runtime, variant);
             }
             catch (...) {
                 log_info("EDAA FG test: exception, presentation test stopped");
@@ -521,8 +547,23 @@ namespace edaa
     }
 
 
+    namespace
+    {
+        void on_init_effect_runtime_fg(effect_runtime* runtime)
+        {
+            const HWND child = p.child.load();
+
+            if (child != nullptr && static_cast<HWND>(runtime->get_hwnd()) == child) {
+                runtime->set_effects_state(false); // effects already applied on the game's D3D11 image
+                log_info("EDAA FG test: ReShade runtime on the D3D12 swap chain, effects disabled there");
+            }
+        }
+    }
+
+
     void register_fg_events()
     {
+        reshade::register_event<reshade::addon_event::init_effect_runtime>(on_init_effect_runtime_fg);
         reshade::register_event<reshade::addon_event::reshade_present>(on_reshade_present_fg);
         reshade::register_event<reshade::addon_event::destroy_device>(on_destroy_device_fg);
     }
@@ -532,5 +573,6 @@ namespace edaa
     {
         reshade::unregister_event<reshade::addon_event::destroy_device>(on_destroy_device_fg);
         reshade::unregister_event<reshade::addon_event::reshade_present>(on_reshade_present_fg);
+        reshade::unregister_event<reshade::addon_event::init_effect_runtime>(on_init_effect_runtime_fg);
     }
 }
