@@ -351,7 +351,7 @@ namespace edaa
 
 
         // Right after the D3D12 device is created: set it, replace it by its proxy.
-        bool sl_device(ComPtr<ID3D12Device>& device, IDXGIAdapter* adapter)
+        bool sl_device(ComPtr<ID3D12Device>& device, IDXGIAdapter* adapter, int fps_limit)
         {
             if (!sl_check("slSetD3DDevice", sl_api.set_device(device.Get()))) {
                 return false;
@@ -389,12 +389,16 @@ namespace edaa
 
             sl::ReflexOptions reflex;
             reflex.mode = sl::ReflexMode::eLowLatency;
+            // One frame limiter for the real frames (an external one fights the Reflex sleep: uneven pacing).
+            reflex.frameLimitUs = fps_limit > 0 ? static_cast<uint32_t>(1000000 / fps_limit) : 0;
 
             if (!sl_check("slReflexSetOptions", sl_api.reflex_set_options(reflex))) {
                 return false;
             }
 
-            log_info("EDAA FG: D3D12 device upgraded to a Streamline proxy, Reflex low latency on");
+            char msg[160];
+            snprintf(msg, sizeof(msg), "EDAA FG: D3D12 device upgraded to a Streamline proxy, Reflex low latency on, limit %d fps", fps_limit);
+            log_info(msg);
             return true;
         }
 
@@ -691,7 +695,7 @@ namespace edaa
         }
 
 
-        bool create_device(ID3D11Device* device)
+        bool create_device(ID3D11Device* device, int fps_limit)
         {
             if (fail("Windows 10 1703 or newer needed (ID3D11Device5)", device->QueryInterface(IID_PPV_ARGS(&p.device11_5)))) {
                 return false;
@@ -719,7 +723,7 @@ namespace edaa
             }
 
 #if EDAA_SL
-            if (p.sl_on && !sl_device(p.device12, adapter.Get())) {
+            if (p.sl_on && !sl_device(p.device12, adapter.Get(), fps_limit)) {
                 log_info("EDAA FG: Streamline cannot use the D3D12 device, presenting without frame generation");
                 p.sl_on = false;
             }
@@ -923,7 +927,7 @@ namespace edaa
         }
 
 
-        void present_frame(effect_runtime* runtime, int variant, bool generate)
+        void present_frame(effect_runtime* runtime, int variant, bool generate, int fps_limit)
         {
             auto* const device = reinterpret_cast<ID3D11Device*>(runtime->get_device()->get_native());
             auto* const ctx = reinterpret_cast<ID3D11DeviceContext*>(runtime->get_command_queue()->get_immediate_command_list()->get_native());
@@ -946,7 +950,7 @@ namespace edaa
                 p.sl_on = generate && sl_start();
 #endif
 
-                if (!create_factory(variant) || !create_device(device) || !create_child(p.parent, bb.Width, bb.Height)) {
+                if (!create_factory(variant) || !create_device(device, fps_limit) || !create_child(p.parent, bb.Width, bb.Height)) {
                     return;
                 }
             }
@@ -1082,13 +1086,14 @@ namespace edaa
         void on_reshade_present_fg(effect_runtime* runtime)
         {
             bool enabled, generate;
-            int variant;
+            int variant, fps_limit;
             {
                 addon_state& s = state();
                 const std::lock_guard<std::recursive_mutex> lock(s.mutex);
                 enabled = s.config.fg_present_test;
                 generate = s.config.fg_generate;
                 variant = s.config.fg_factory;
+                fps_limit = s.config.fg_fps_limit;
             }
 
             // The runtime ReShade adds on our D3D12 swap chain presents too: ignore it.
@@ -1104,7 +1109,7 @@ namespace edaa
             }
 
             try {
-                present_frame(runtime, variant, generate);
+                present_frame(runtime, variant, generate, fps_limit);
                 inputs_wanted = p.sl_on && generate && !p.failed;
             }
             catch (...) {
