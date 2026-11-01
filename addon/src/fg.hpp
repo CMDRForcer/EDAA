@@ -20,6 +20,22 @@ namespace edaa::fg
         float near_plane = 0, vfov_deg = 0, aspect = 0, sx = 0, sy = 0;
     };
 
+    // For the overlay.
+    struct status
+    {
+        bool d3d12_path = false; // presenting through the D3D12 swap chain
+        bool streamline = false; // Streamline loaded (DLSS-G and Reflex available)
+        bool generating = false; // DLSS-G on and adding frames
+        bool background = false; // the game is not the foreground window (DLSS-G pauses)
+        bool waiting = false; // no scene from EDAA (menus, maps, loading): DLSS-G pauses
+        bool reflex = false;
+        float real_fps = 0, shown_fps = 0;
+        unsigned dlssg_status = 0; // sl::DLSSGStatus flags (0 = ok)
+        const char* error = nullptr; // why the D3D12 path stopped
+    };
+
+    status get_status();
+
     // True while DLSS Frame Generation runs and needs depth and motion vectors.
     bool wants_inputs();
 

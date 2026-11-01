@@ -86,6 +86,14 @@ namespace edaa
             fg::frame_inputs inputs;
             bool inputs_fresh = false; // captured since the last present
             uint32_t stale_frames = 1000; // presents since the last capture
+            int fps_limit = -1; // Reflex limit last set
+            // Overlay status.
+            LARGE_INTEGER last_time = {};
+            float real_fps = 0;
+            uint32_t presented = 1; // DLSS-G frames per real frame (last query)
+            unsigned dlssg_status = 0;
+            bool focus = true;
+            const char* error = nullptr;
             bool sl_on = false; // Streamline loaded, D3D12 objects are its proxies
         };
 
@@ -121,6 +129,7 @@ namespace edaa
             snprintf(msg, sizeof(msg), "EDAA FG test: %s (0x%08lX), presentation test stopped", what, static_cast<unsigned long>(hr));
             reshade::log::message(reshade::log::level::error, msg);
             p.failed = true;
+            p.error = what;
             return true;
         }
 
@@ -350,6 +359,24 @@ namespace edaa
         }
 
 
+        // Reflex low latency and its frame limiter. With DLSS-G on, the limit is
+        // for the displayed frames (real + generated). One limiter only: an
+        // external one fights the Reflex sleep (uneven pacing).
+        bool sl_reflex(int fps_limit)
+        {
+            sl::ReflexOptions reflex;
+            reflex.mode = sl::ReflexMode::eLowLatency;
+            reflex.frameLimitUs = fps_limit > 0 ? static_cast<uint32_t>(1000000 / fps_limit) : 0;
+
+            if (!sl_check("slReflexSetOptions", sl_api.reflex_set_options(reflex))) {
+                return false;
+            }
+
+            p.fps_limit = fps_limit;
+            return true;
+        }
+
+
         // Right after the D3D12 device is created: set it, replace it by its proxy.
         bool sl_device(ComPtr<ID3D12Device>& device, IDXGIAdapter* adapter, int fps_limit)
         {
@@ -387,12 +414,7 @@ namespace edaa
                 return false;
             }
 
-            sl::ReflexOptions reflex;
-            reflex.mode = sl::ReflexMode::eLowLatency;
-            // One frame limiter for the real frames (an external one fights the Reflex sleep: uneven pacing).
-            reflex.frameLimitUs = fps_limit > 0 ? static_cast<uint32_t>(1000000 / fps_limit) : 0;
-
-            if (!sl_check("slReflexSetOptions", sl_api.reflex_set_options(reflex))) {
+            if (!sl_reflex(fps_limit)) {
                 return false;
             }
 
@@ -564,22 +586,31 @@ namespace edaa
         }
 
 
+        // Every 15 frames: DLSS-G state for the overlay, logged now and then.
         void sl_log_state()
         {
-            if (p.frames != 30 && p.frames % 1800 != 0) {
+            if (p.frames % 15 != 0) {
                 return;
             }
 
+            p.focus = GetForegroundWindow() == GetAncestor(p.parent, GA_ROOT);
             sl::DLSSGState st;
 
             if (sl_api.dlssg_get_state(sl::ViewportHandle(0), st, nullptr) != sl::Result::eOk) {
                 return;
             }
 
+            p.presented = st.numFramesActuallyPresented;
+            p.dlssg_status = static_cast<unsigned>(st.status);
+
+            if (p.frames != 30 && p.frames % 1800 != 0) {
+                return;
+            }
+
             char msg[256];
             snprintf(msg, sizeof(msg), "EDAA FG: DLSS-G state at frame %llu: status 0x%X, frames presented %u, frames without new inputs %u, reset %d, focus %d",
                 static_cast<unsigned long long>(p.frames), static_cast<unsigned>(st.status), st.numFramesActuallyPresented,
-                p.stale_frames, p.inputs.reset ? 1 : 0, GetForegroundWindow() == GetAncestor(p.parent, GA_ROOT) ? 1 : 0);
+                p.stale_frames, p.inputs.reset ? 1 : 0, p.focus ? 1 : 0);
             log_info(msg);
         }
 #endif
@@ -991,6 +1022,10 @@ namespace edaa
 #if EDAA_SL
             // DLSS-G inputs of this frame (copied by Streamline now, on this list).
             if (p.sl_on) {
+                if (fps_limit != p.fps_limit) {
+                    sl_reflex(fps_limit); // changed in the overlay
+                }
+
                 sl_begin_frame();
                 sl_end_simulation();
                 // Some frames have no resolve (menus, loading): keep DLSS-G on with the
@@ -1076,6 +1111,17 @@ namespace edaa
                 fail("D3D12 present failed", presented);
                 return;
             }
+
+            LARGE_INTEGER now, freq;
+            QueryPerformanceCounter(&now);
+            QueryPerformanceFrequency(&freq);
+
+            if (p.last_time.QuadPart != 0 && now.QuadPart > p.last_time.QuadPart) {
+                const float fps = static_cast<float>(freq.QuadPart) / static_cast<float>(now.QuadPart - p.last_time.QuadPart);
+                p.real_fps = p.real_fps <= 0 ? fps : p.real_fps * 0.95f + fps * 0.05f;
+            }
+
+            p.last_time = now;
 
             if (++p.frames == 1) {
                 log_info("EDAA FG test: first frame presented through D3D12");
@@ -1196,6 +1242,26 @@ namespace edaa
                 log_info("EDAA FG test: ReShade runtime on the D3D12 swap chain, effects disabled there");
             }
         }
+    }
+
+
+    fg::status fg::get_status()
+    {
+        const std::lock_guard<std::mutex> lock(presenter_mutex);
+        status st;
+        st.d3d12_path = p.swapchain != nullptr && !p.failed;
+        st.streamline = p.sl_on;
+        st.reflex = p.sl_on && p.fps_limit >= 0;
+        st.background = !p.focus;
+        st.waiting = p.stale_frames >= 120;
+        st.real_fps = p.real_fps;
+#if EDAA_SL
+        st.generating = st.d3d12_path && p.sl_on && sl_api.dlssg_on && p.presented > 1;
+#endif
+        st.shown_fps = p.real_fps * static_cast<float>(st.generating ? p.presented : 1);
+        st.dlssg_status = p.dlssg_status;
+        st.error = p.error;
+        return st;
     }
 
 
