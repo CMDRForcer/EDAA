@@ -126,6 +126,18 @@ else()
 	target_compile_definitions(edaa PRIVATE EDAA_XESS=0)
 	message(STATUS "Building without XeSS (EDAA_WITH_XESS off or SDK not in third_party/xess)")
 endif()
+# NVIDIA Streamline (DLSS Frame Generation, experimental): headers only, the DLLs
+# are loaded at run time from the add-on folder. third_party/streamline is the
+# extracted SDK zip (CI downloads it); the DLLs are shipped next to EDAA.addon64.
+option(EDAA_WITH_STREAMLINE "Build with NVIDIA Streamline when the SDK is present" ON)
+set(SL_DIR ${CMAKE_SOURCE_DIR}/third_party/streamline)
+if(EDAA_WITH_STREAMLINE AND EXISTS ${SL_DIR}/include/sl_dlss_g.h)
+	target_include_directories(edaa SYSTEM PRIVATE ${SL_DIR}/include)
+	target_compile_definitions(edaa PRIVATE EDAA_SL=1)
+else()
+	target_compile_definitions(edaa PRIVATE EDAA_SL=0)
+	message(STATUS "Building without Streamline (SDK not in third_party/streamline)")
+endif()
 # C4702 (unreachable code) is reported by the optimizer inside reshade_overlay.hpp.
 target_compile_options(edaa PRIVATE /W4 /permissive- /utf-8 /wd4702)
 # Static CRT: no VC++ redistributable needed on the user's machine.

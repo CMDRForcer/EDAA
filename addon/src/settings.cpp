@@ -60,6 +60,7 @@ namespace edaa
             EDAA_FIELD(dlss_preset, integer),
             EDAA_FIELD(fg_present_test, boolean),
             EDAA_FIELD(fg_factory, integer),
+            EDAA_FIELD(fg_generate, boolean),
         };
 #undef EDAA_FIELD
 

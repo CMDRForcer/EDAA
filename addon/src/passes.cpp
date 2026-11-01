@@ -20,6 +20,7 @@
 
 #include "profile.hpp"
 #include "events.hpp"
+#include "fg.hpp"
 #include "state.hpp"
 
 #include <algorithm>
@@ -880,6 +881,40 @@ namespace edaa
             bind_srvs(ctx, { gpu.depth.srv.Get(), nullptr, nullptr, nullptr, gpu.stencil_srv.Get() });
             ctx->PSSetShader(gpu.ps_motion.Get(), nullptr, 0);
             ctx->Draw(3, 0);
+
+            // Frame generation (fg_present.cpp): depth (typed R32_FLOAT copy) and
+            // motion vectors of this frame, with the camera, for DLSS-G at Present.
+            if (fg::wants_inputs() && (gpu.depth_copy.tex || create_target(DXGI_FORMAT_R32_FLOAT, gpu.depth_copy))) {
+                bind_srvs(ctx, {});
+                ID3D11RenderTargetView* const depth_target[] = { gpu.depth_copy.rtv.Get() };
+                ctx->OMSetRenderTargets(1, depth_target, nullptr);
+                bind_srvs(ctx, { nullptr, gpu.depth.srv.Get() });
+                ctx->PSSetShader(gpu.ps_copy.Get(), nullptr, 0);
+                ctx->Draw(3, 0);
+                bind_srvs(ctx, {});
+                ctx->OMSetRenderTargets(0, nullptr, nullptr);
+
+                fg::frame_inputs f;
+                f.render_w = in.render_w;
+                f.render_h = in.render_h;
+                f.jitter_x = in.jitter_x;
+                f.jitter_y = in.jitter_y;
+                f.reset = in.camera_cut;
+                std::memcpy(f.view_proj, in.camera.view_proj, sizeof(f.view_proj));
+                std::memcpy(f.inv_view_proj, mc.inv_view_proj, sizeof(f.inv_view_proj));
+                std::memcpy(f.prev_view_proj, in.prev_camera.view_proj, sizeof(f.prev_view_proj));
+                std::memcpy(f.camera_delta, mc.camera_delta, sizeof(f.camera_delta));
+                std::memcpy(f.camera_pos, in.camera.position, sizeof(f.camera_pos));
+                f.near_plane = in.camera.info.near_plane;
+                f.vfov_deg = in.camera.info.vfov_deg;
+                f.aspect = in.camera.info.aspect;
+                f.sx = in.camera.info.sx;
+                f.sy = in.camera.info.sy;
+                fg::capture(ctx, gpu.depth_copy.tex.Get(), gpu.motion.tex.Get(), f);
+                // The next pass binds its own targets and shaders.
+                bind_fullscreen(ctx);
+                set_viewport(ctx, w, h);
+            }
 
             if (!in.config.taa_enabled || in.upscaling) {
                 gpu.history_valid = false;
