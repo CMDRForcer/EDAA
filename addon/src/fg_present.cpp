@@ -806,11 +806,30 @@ namespace edaa
         }
 
 
-        void wait_for(uint64_t value)
+        // CPU wait for the D3D12 side; true if reached. The game's D3D11 queue
+        // never waits on D3D12 on the GPU: a stalled D3D12 present (frame
+        // generation pacing, a game hitch) must not freeze the game's GPU work.
+        bool wait_for(uint64_t value, DWORD timeout_ms = 1000)
         {
-            if (p.fence12->GetCompletedValue() < value) {
-                p.fence12->SetEventOnCompletion(value, p.fence_event);
-                WaitForSingleObject(p.fence_event, 1000);
+            if (p.fence12->GetCompletedValue() >= value) {
+                return true;
+            }
+
+            p.fence12->SetEventOnCompletion(value, p.fence_event);
+            WaitForSingleObject(p.fence_event, timeout_ms);
+            return p.fence12->GetCompletedValue() >= value;
+        }
+
+
+        void log_busy(const char* where)
+        {
+            static int count = 0;
+
+            if (count < 20) {
+                ++count;
+                char msg[160];
+                snprintf(msg, sizeof(msg), "EDAA FG: D3D12 side still busy at %s (frame %llu), skipped", where, static_cast<unsigned long long>(p.frames));
+                reshade::log::message(reshade::log::level::warning, msg);
             }
         }
 
@@ -999,7 +1018,12 @@ namespace edaa
             }
 
             // D3D11: wait until D3D12 read the previous copy, copy, signal.
-            ctx4->Wait(p.fence11.Get(), p.copy_done);
+            // D3D12 finished reading the previous copy (CPU wait, bounded).
+            if (!wait_for(p.copy_done, 100)) {
+                log_busy("present");
+                return;
+            }
+
             ctx->CopyResource(p.shared11.Get(), back_buffer);
             const uint64_t ready = ++p.fence_value;
             ctx4->Signal(p.fence11.Get(), ready);
@@ -1311,14 +1335,13 @@ namespace edaa
                 return;
             }
 
-            ComPtr<ID3D11DeviceContext4> ctx4;
-
-            if (FAILED(ctx->QueryInterface(IID_PPV_ARGS(&ctx4)))) {
+            // D3D12 (and Streamline) finished with the previous inputs: never
+            // block the game here, skip this frame's inputs instead.
+            if (p.fence12->GetCompletedValue() < p.copy_done) {
+                log_busy("input capture");
                 return;
             }
 
-            // D3D12 (and Streamline) finished with the previous inputs.
-            ctx4->Wait(p.fence11.Get(), p.copy_done);
             ctx->CopyResource(p.depth11.Get(), depth);
             ctx->CopyResource(p.motion11.Get(), motion);
             p.inputs = in;
