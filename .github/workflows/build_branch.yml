@@ -9,6 +9,9 @@ on:
       - 'cmdr/**'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-2022
@@ -25,6 +28,23 @@ jobs:
           cmake -S . -B build -G "Visual Studio 17 2022" -A x64 "-DEDAA_VERSION=$v"
           cmake --build build --config Release
           if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      # Also commit the add-on to branch builds/<branch> (readable through the
+      # git/contents API, unlike artifact storage).
+      - name: Publish to builds branch
+        shell: pwsh
+        run: |
+          $branch = "builds/${{ github.ref_name }}"
+          New-Item -ItemType Directory -Force out | Out-Null
+          Copy-Item build/Release/EDAA.addon64 out/
+          Set-Location out
+          git init -q
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          "${{ github.sha }}" | Out-File -Encoding ascii source_commit.txt
+          git add -A
+          git commit -q -m "Build of ${{ github.ref_name }} at ${{ github.sha }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" "HEAD:refs/heads/$branch"
 
       - uses: actions/upload-artifact@v4
         with:
