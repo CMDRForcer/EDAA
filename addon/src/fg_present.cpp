@@ -85,7 +85,9 @@ namespace edaa
             ComPtr<ID3D12Resource> depth12, motion12;
             fg::frame_inputs inputs;
             bool inputs_fresh = false; // captured since the last present
-            uint32_t stale_frames = 1000; // presents since the last capture
+            uint32_t stale_frames = 1000; // presents without a resolve (no scene: menus, maps, loading)
+            bool resolve_seen = false; // resolve ran since the last present (inputs maybe skipped)
+            uint64_t busy_skips = 0; // captures skipped while D3D12 was busy
             int fps_limit = -1; // Reflex limit last set
             // Overlay status.
             LARGE_INTEGER last_time = {};
@@ -609,9 +611,9 @@ namespace edaa
             }
 
             char msg[256];
-            snprintf(msg, sizeof(msg), "EDAA FG: DLSS-G state at frame %llu: status 0x%X, frames presented %u, frames without new inputs %u, reset %d, focus %d",
+            snprintf(msg, sizeof(msg), "EDAA FG: DLSS-G state at frame %llu: status 0x%X, frames presented %u, frames without a scene %u, reset %d, focus %d, busy skips %llu",
                 static_cast<unsigned long long>(p.frames), static_cast<unsigned>(st.status), st.numFramesActuallyPresented,
-                p.stale_frames, p.inputs.reset ? 1 : 0, p.focus ? 1 : 0);
+                p.stale_frames, p.inputs.reset ? 1 : 0, p.focus ? 1 : 0, static_cast<unsigned long long>(p.busy_skips));
             log_info(msg);
         }
 #endif
@@ -1056,12 +1058,12 @@ namespace edaa
                 // Some frames have no resolve (menus, loading): keep DLSS-G on with the
                 // last inputs (switching it off and on reallocates it, a long stall),
                 // off only after a while without any.
-                p.stale_frames = p.inputs_fresh ? 0 : p.stale_frames + 1;
+                p.stale_frames = p.inputs_fresh || p.resolve_seen ? 0 : p.stale_frames + 1;
                 const bool on = generate && sl_api.token != nullptr && p.depth12 && p.motion12 && p.inputs.render_w > 0 && p.stale_frames < 120;
                 sl_options(on);
 
                 if (on) {
-                    p.inputs.reset = p.inputs.reset || p.stale_frames > 0;
+                    p.inputs.reset = p.inputs.reset || !p.inputs_fresh; // last frame's inputs: no interpolation history
                     sl::Resource depth(sl::ResourceType::eTex2d, p.depth12.Get(), nullptr, nullptr, static_cast<uint32_t>(D3D12_RESOURCE_STATE_COMMON));
                     sl::Resource motion(sl::ResourceType::eTex2d, p.motion12.Get(), nullptr, nullptr, static_cast<uint32_t>(D3D12_RESOURCE_STATE_COMMON));
                     sl::Extent extent;
@@ -1122,6 +1124,7 @@ namespace edaa
             p.copy_done = ++p.fence_value;
             p.queue->Signal(p.fence12.Get(), p.copy_done);
             p.inputs_fresh = false;
+            p.resolve_seen = false;
 
 #if EDAA_SL
             if (p.sl_on) {
@@ -1335,9 +1338,12 @@ namespace edaa
                 return;
             }
 
-            // D3D12 (and Streamline) finished with the previous inputs: never
-            // block the game here, skip this frame's inputs instead.
-            if (p.fence12->GetCompletedValue() < p.copy_done) {
+            // D3D12 (and Streamline) finished with the previous inputs: a short
+            // CPU wait (the GPU never waits), else skip this frame's inputs.
+            p.resolve_seen = true;
+
+            if (!wait_for(p.copy_done, 8)) {
+                ++p.busy_skips;
                 log_busy("input capture");
                 return;
             }
