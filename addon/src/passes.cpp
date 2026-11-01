@@ -647,7 +647,7 @@ namespace edaa
         // first are combined with max blending.
         void draw_hud_mask(ID3D11DeviceContext* ctx, bool final)
         {
-            if (!upscale_in.snapshot || upscale_in.mask_final || !gpu.color.srv ||
+            if (!upscale_in.snapshot || upscale_in.mask_final || !gpu.color.srv || !gpu.hud_snapshot.srv ||
                 (!gpu.hud_mask.tex && !create_target(DXGI_FORMAT_R8_UNORM, gpu.hud_mask))) {
                 return;
             }
@@ -807,6 +807,24 @@ namespace edaa
         }
 
 
+        // True if 'source' can be copied into the HUD snapshot (same size and
+        // format family): the game swaps its targets (e.g. station services).
+        bool snapshot_fits(ID3D11Resource* source)
+        {
+            ComPtr<ID3D11Texture2D> tex;
+
+            if (source == nullptr || !gpu.hud_snapshot.tex || FAILED(source->QueryInterface(IID_PPV_ARGS(&tex)))) {
+                return false;
+            }
+
+            D3D11_TEXTURE2D_DESC src, dst;
+            tex->GetDesc(&src);
+            gpu.hud_snapshot.tex->GetDesc(&dst);
+            const DXGI_FORMAT typed = src.Format == DXGI_FORMAT_R16G16B16A16_TYPELESS ? DXGI_FORMAT_R16G16B16A16_FLOAT : src.Format;
+            return src.Width == dst.Width && src.Height == dst.Height && src.SampleDesc.Count == 1 && src.ArraySize == 1 && typed == dst.Format;
+        }
+
+
         // Frame generation HUD protection: the scene after the anti-aliasing,
         // compared at the bloom with the scene holding the HUD (draw_hud_mask).
         // Not when upscaling: that path takes its own snapshot.
@@ -814,6 +832,12 @@ namespace edaa
         {
             if (!fg::wants_inputs() || !in.config.fg_hud_protect || in.upscaling || !gpu.color.srv ||
                 (!gpu.hud_snapshot.tex && !create_target(gpu.color_format, gpu.hud_snapshot))) {
+                return;
+            }
+
+            if (!snapshot_fits(reinterpret_cast<ID3D11Resource*>(in.scene_color))) {
+                upscale_in.snapshot = false;
+                fg_mask_valid = false;
                 return;
             }
 
@@ -1354,7 +1378,8 @@ namespace edaa
         try {
             const std::lock_guard<std::mutex> lock(gpu_mutex);
 
-            if (gpu.device != device || !upscale_in.snapshot || upscale_in.mask_final || gpu.color.handle == 0) {
+            if (gpu.device != device || !upscale_in.snapshot || upscale_in.mask_final || gpu.color.handle == 0 ||
+                !snapshot_fits(reinterpret_cast<ID3D11Resource*>(gpu.color.handle))) {
                 return;
             }
 
