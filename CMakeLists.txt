@@ -78,6 +78,7 @@ add_library(edaa SHARED
 	addon/src/settings.cpp
 	addon/src/dlss.cpp
 	addon/src/xess.cpp
+	addon/src/fg_present.cpp
 	addon/edaa.rc
 	${SHADER_HEADER}
 	${TAA_HEADER}
