@@ -527,24 +527,6 @@ namespace edaa
     }
 
 
-    // Own tab "EDAA DLSS FG" in the ReShade overlay.
-    void draw_fg_overlay(reshade::api::effect_runtime*)
-    {
-        addon_state& s = state();
-        const std::lock_guard<std::recursive_mutex> lock(s.mutex);
-
-        ImGui::Text("EDAA DLSS Frame Generation (%s)", version);
-        ImGui::Separator();
-        change_tracker edit;
-        draw_frame_generation(s, edit);
-
-        if (edit.changed) {
-            sync_upscaler(s.config);
-            save_settings(s.config);
-        }
-    }
-
-
     void draw_overlay(reshade::api::effect_runtime*)
     {
         addon_state& s = state();
@@ -556,10 +538,8 @@ namespace edaa
         change_tracker edit;
         draw_main(s, edit);
 
-        {
-            const fg::status st = fg::get_status();
-            ImGui::TextDisabled("Frame Generation: %s (settings in the \"EDAA DLSS FG\" tab)",
-                st.generating ? "running" : s.config.fg_generate ? "on" : "off");
+        if (ImGui::CollapsingHeader("Frame Generation", ImGuiTreeNodeFlags_DefaultOpen)) {
+            draw_frame_generation(s, edit);
         }
 
         if (ImGui::CollapsingHeader("Advanced settings")) {

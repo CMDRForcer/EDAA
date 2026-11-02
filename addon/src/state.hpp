@@ -357,7 +357,6 @@ namespace edaa
 
     // Overlay window registered with ReShade.
     void draw_overlay(reshade::api::effect_runtime* runtime);
-    void draw_fg_overlay(reshade::api::effect_runtime* runtime);
 
     const char* to_string(frame_mode mode);
 }
