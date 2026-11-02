@@ -63,7 +63,8 @@ namespace edaa
             ComPtr<ID3D11Fence> fence11;
             HANDLE fence_event = nullptr;
             uint64_t fence_value = 0; // last value signalled by either side
-            uint64_t copy_done = 0; // D3D12 finished reading the shared texture up to this value
+            uint64_t copy_done = 0; // D3D12 finished the last present (and frame generation) up to this value
+            uint64_t list_done = 0; // D3D12 finished the last command list: the shared image is free again
 
             // Shared texture (D3D11 writes, D3D12 reads).
             ComPtr<ID3D11Texture2D> shared11;
@@ -81,8 +82,13 @@ namespace edaa
             uint64_t frames = 0;
 
             // Step 2: depth and motion vectors shared with D3D12 (copied at resolve).
-            ComPtr<ID3D11Texture2D> depth11, motion11;
-            ComPtr<ID3D12Resource> depth12, motion12;
+            // Two sets, written alternately: the next frame's inputs are copied
+            // while D3D12 may still read the previous set (no wait, no skip).
+            ComPtr<ID3D11Texture2D> depth11[2], motion11[2];
+            ComPtr<ID3D12Resource> depth12[2], motion12[2];
+            uint64_t set_done[2] = {}; // the command list that read this set finished at this value
+            int write_set = 0; // set the next capture writes
+            int ready_set = -1; // set holding the latest captured inputs
             fg::frame_inputs inputs;
             bool inputs_fresh = false; // captured since the last present
             uint32_t stale_frames = 1000; // presents without a resolve (no scene: menus, maps, loading)
@@ -1021,7 +1027,7 @@ namespace edaa
 
             // D3D11: wait until D3D12 read the previous copy, copy, signal.
             // D3D12 finished reading the previous copy (CPU wait, bounded).
-            if (!wait_for(p.copy_done, 100)) {
+            if (!wait_for(p.list_done, 100)) {
                 log_busy("present");
                 return;
             }
@@ -1059,13 +1065,16 @@ namespace edaa
                 // last inputs (switching it off and on reallocates it, a long stall),
                 // off only after a while without any.
                 p.stale_frames = p.inputs_fresh || p.resolve_seen ? 0 : p.stale_frames + 1;
-                const bool on = generate && sl_api.token != nullptr && p.depth12 && p.motion12 && p.inputs.render_w > 0 && p.stale_frames < 120;
+                const int set = p.ready_set;
+                const bool on = generate && sl_api.token != nullptr && set >= 0 && p.depth12[set] && p.motion12[set] && p.inputs.render_w > 0 && p.stale_frames < 120;
                 sl_options(on);
 
                 if (on) {
                     p.inputs.reset = p.inputs.reset || !p.inputs_fresh; // last frame's inputs: no interpolation history
-                    sl::Resource depth(sl::ResourceType::eTex2d, p.depth12.Get(), nullptr, nullptr, static_cast<uint32_t>(D3D12_RESOURCE_STATE_COMMON));
-                    sl::Resource motion(sl::ResourceType::eTex2d, p.motion12.Get(), nullptr, nullptr, static_cast<uint32_t>(D3D12_RESOURCE_STATE_COMMON));
+                    // Streamline copies the tagged inputs on this command list (eOnlyValidNow):
+                    // the set is free once the list ran.
+                    sl::Resource depth(sl::ResourceType::eTex2d, p.depth12[set].Get(), nullptr, nullptr, static_cast<uint32_t>(D3D12_RESOURCE_STATE_COMMON));
+                    sl::Resource motion(sl::ResourceType::eTex2d, p.motion12[set].Get(), nullptr, nullptr, static_cast<uint32_t>(D3D12_RESOURCE_STATE_COMMON));
                     sl::Extent extent;
                     extent.width = p.inputs.render_w;
                     extent.height = p.inputs.render_h;
@@ -1109,6 +1118,15 @@ namespace edaa
             const uint64_t done = ++p.fence_value;
             p.queue->Signal(p.fence12.Get(), done);
             p.allocator_values[index] = done;
+            p.list_done = done;
+
+            if (p.ready_set >= 0) {
+                p.set_done[p.ready_set] = done;
+
+                if (p.inputs_fresh) {
+                    p.write_set = 1 - p.ready_set; // next capture: the other set
+                }
+            }
             step("D3D12 work submitted, presenting");
 
 #if EDAA_SL
@@ -1184,8 +1202,8 @@ namespace edaa
             if (enabled && generate && hud_protect) {
                 const std::lock_guard<std::mutex> lock(presenter_mutex);
 
-                if (p.sl_on && !p.failed && p.inputs_fresh) {
-                    hud_target = p.motion11;
+                if (p.sl_on && !p.failed && p.inputs_fresh && p.ready_set >= 0) {
+                    hud_target = p.motion11[p.ready_set];
                 }
             }
 
@@ -1250,10 +1268,17 @@ namespace edaa
             p.factory.Reset();
             p.shared12.Reset();
             p.shared11.Reset();
-            p.depth12.Reset();
-            p.depth11.Reset();
-            p.motion12.Reset();
-            p.motion11.Reset();
+            for (int i = 0; i < 2; ++i) {
+                p.depth12[i].Reset();
+                p.depth11[i].Reset();
+                p.motion12[i].Reset();
+                p.motion11[i].Reset();
+                p.set_done[i] = 0;
+            }
+
+            p.write_set = 0;
+            p.ready_set = -1;
+            p.list_done = 0;
             p.inputs_fresh = false;
             p.list.Reset();
 
@@ -1334,23 +1359,26 @@ namespace edaa
         }
 
         try {
-            if (!share_input(depth, p.depth11, p.depth12) || !share_input(motion, p.motion11, p.motion12)) {
+            const int w = p.write_set;
+
+            if (!share_input(depth, p.depth11[w], p.depth12[w]) || !share_input(motion, p.motion11[w], p.motion12[w])) {
                 return;
             }
 
-            // D3D12 (and Streamline) finished with the previous inputs: a short
-            // CPU wait (the GPU never waits), else skip this frame's inputs.
+            // D3D12 finished reading this set (two frames ago): normally already
+            // true. Else a short CPU wait (the GPU never waits), then skip.
             p.resolve_seen = true;
 
-            if (!wait_for(p.copy_done, 8)) {
+            if (!wait_for(p.set_done[w], 8)) {
                 ++p.busy_skips;
                 log_busy("input capture");
                 return;
             }
 
-            ctx->CopyResource(p.depth11.Get(), depth);
-            ctx->CopyResource(p.motion11.Get(), motion);
+            ctx->CopyResource(p.depth11[w].Get(), depth);
+            ctx->CopyResource(p.motion11[w].Get(), motion);
             p.inputs = in;
+            p.ready_set = w;
             p.inputs_fresh = true;
 #if EDAA_SL
             sl_end_simulation();
