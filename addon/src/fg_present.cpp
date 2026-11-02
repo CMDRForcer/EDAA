@@ -19,6 +19,7 @@
 #include "state.hpp"
 
 #include <atomic>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -108,6 +109,37 @@ namespace edaa
 
         presenter p;
         std::mutex presenter_mutex;
+
+        // DLSS-G presents from its own pacing thread while the game presents on
+        // its render thread. Hooks of other programs on Present (Steam overlay:
+        // gameoverlayrenderer64.dll) are not made for two threads at once and
+        // crash. While frame generation runs, the two presents never overlap:
+        // the lock is taken right before each one and released after it
+        // (finish_present), with a time limit so nothing can hang.
+        std::timed_mutex present_serial;
+        thread_local bool present_serial_held = false;
+        std::atomic<bool> serialize_presents{ false };
+
+
+        void serial_lock()
+        {
+            if (present_serial_held || !serialize_presents) {
+                return;
+            }
+
+            if (present_serial.try_lock_for(std::chrono::milliseconds(100))) {
+                present_serial_held = true;
+            }
+        }
+
+
+        void serial_unlock()
+        {
+            if (present_serial_held) {
+                present_serial_held = false;
+                present_serial.unlock();
+            }
+        }
         std::atomic<bool> inputs_wanted{ false };
 
 
@@ -1228,6 +1260,9 @@ namespace edaa
             try {
                 present_frame(runtime, variant, generate, fps_limit);
                 inputs_wanted = p.sl_on && generate && !p.failed;
+                // The game's own present follows right after this event.
+                serialize_presents = p.sl_on && !p.failed;
+                serial_lock();
             }
             catch (...) {
                 log_info("EDAA FG test: exception, presentation test stopped");
@@ -1264,6 +1299,7 @@ namespace edaa
             }
 
             inputs_wanted = false;
+            serialize_presents = false;
             p.swapchain.Reset();
             p.factory.Reset();
             p.shared12.Reset();
@@ -1391,8 +1427,30 @@ namespace edaa
     }
 
 
+    namespace
+    {
+        // Present of our D3D12 swap chain, from whichever thread Streamline uses.
+        void on_present_fg(command_queue*, swapchain* swapchain, const rect*, const rect*, uint32_t, const rect*)
+        {
+            const HWND child = p.child.load();
+
+            if (child != nullptr && static_cast<HWND>(swapchain->get_hwnd()) == child) {
+                serial_lock();
+            }
+        }
+
+
+        void on_finish_present_fg(command_queue*, swapchain*)
+        {
+            serial_unlock();
+        }
+    }
+
+
     void register_fg_events()
     {
+        reshade::register_event<reshade::addon_event::present>(on_present_fg);
+        reshade::register_event<reshade::addon_event::finish_present>(on_finish_present_fg);
         reshade::register_event<reshade::addon_event::init_effect_runtime>(on_init_effect_runtime_fg);
         reshade::register_event<reshade::addon_event::reshade_present>(on_reshade_present_fg);
         reshade::register_event<reshade::addon_event::destroy_device>(on_destroy_device_fg);
@@ -1404,5 +1462,7 @@ namespace edaa
         reshade::unregister_event<reshade::addon_event::destroy_device>(on_destroy_device_fg);
         reshade::unregister_event<reshade::addon_event::reshade_present>(on_reshade_present_fg);
         reshade::unregister_event<reshade::addon_event::init_effect_runtime>(on_init_effect_runtime_fg);
+        reshade::unregister_event<reshade::addon_event::finish_present>(on_finish_present_fg);
+        reshade::unregister_event<reshade::addon_event::present>(on_present_fg);
     }
 }
