@@ -1304,6 +1304,7 @@ namespace edaa
 
         const std::lock_guard<std::recursive_mutex> lock(s.mutex);
         s.motion_ok = error == nullptr;
+        s.resolve_ran = true;
         s.fg_hud_pending = fg_snapshot_taken.exchange(false) && error == nullptr;
 
         // First launch or reset to defaults: the best method this system runs,

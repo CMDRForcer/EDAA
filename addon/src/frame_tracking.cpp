@@ -23,6 +23,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -983,6 +984,37 @@ namespace edaa
         }
 
         s.map_reason = !map ? "no" : (s.current.map_shader_drawn ? "yes (system map shaders)" : "yes (no sun shadow pass)");
+
+        // Diagnostics: status changes and stretches without an anti-aliasing
+        // resolve (e.g. carrier jump or hyperspace transitions), with the time in the log.
+        {
+            static int logged = 0;
+
+            if (s.resolve_ran) {
+                if (s.frames_without_resolve >= 3 && logged < 400) {
+                    ++logged;
+                    char msg[160];
+                    snprintf(msg, sizeof(msg), "EDAA status: anti-aliasing resolve back after %u frames without one", s.frames_without_resolve);
+                    reshade::log::message(reshade::log::level::info, msg);
+                }
+
+                s.frames_without_resolve = 0;
+            }
+            else if (++s.frames_without_resolve == 3 && logged < 400) {
+                ++logged;
+                reshade::log::message(reshade::log::level::info, "EDAA status: no anti-aliasing resolve for 3 frames (no scene found)");
+            }
+
+            s.resolve_ran = false;
+
+            if (s.motion_status != nullptr && std::strncmp(s.motion_status, s.logged_status, sizeof(s.logged_status) - 1) != 0 && logged < 400) {
+                ++logged;
+                std::strncpy(s.logged_status, s.motion_status, sizeof(s.logged_status) - 1);
+                char msg[256];
+                snprintf(msg, sizeof(msg), "EDAA status: %s", s.motion_status);
+                reshade::log::message(reshade::log::level::info, msg);
+            }
+        }
 
         if (s.screenshot_mode && --s.screenshot_hold <= 0) {
             s.screenshot_mode = false;

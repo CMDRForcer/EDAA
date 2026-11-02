@@ -231,6 +231,10 @@ namespace edaa
         int resolve_misses = 0;
         bool jitter_allowed = true;
         const char* motion_status = "not started";
+        // Diagnostics (log): resolve seen this frame, frames in a row without one, last logged status.
+        bool resolve_ran = false;
+        uint32_t frames_without_resolve = 0;
+        char logged_status[192] = {};
 
         bool capture_requested = false; // Ctrl+Shift+C / overlay button
         std::string capture_path; // UTF-8 base folder, "[EDAA] CapturePath" in ReShade.ini
