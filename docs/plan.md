@@ -35,7 +35,8 @@ Stand: 03.11.2026 – Planung abgeschlossen (mit Gerrit durchgegangen).
 - Steam-Overlay-Fix (serialisierte Presents, Commit 1a8f6a2) über mehrere Abende bestätigen,
   dann nach `cmdr/stable` und Release `v0.5.3-cmdr1`.
 - Test-Schlüssel aufräumen: `fg_present_test`/`fg_factory` → ein Schalter; Diagnose begrenzen.
-- Carrier-Sprung prüfen („EDAA status: …“-Zeilen im Log).
+- Testabend = über eine Stunde spielen, sauber beenden. Carrier-Sprung vorerst kein
+  Testkriterium (03.11. entschieden); später gesondert prüfen („EDAA status: …“-Zeilen im Log).
 - Release-Notizen: bekannte Fallen (Supersampling, Checkerboard, RTSS).
 - Zwei ReShade-Laufzeiten mit FG (D3D11 = `ReShade.ini`, D3D12-FG-Fenster = `ReShade2.ini`):
   nach „Neu laden“ im Overlay „Failed to create graphics pipeline“ für alle Techniken (03.11.).
