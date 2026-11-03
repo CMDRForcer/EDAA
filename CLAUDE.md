@@ -49,7 +49,8 @@ Originale EDAA-Doku: `docs/addon.md`, `docs/motion-vectors.md`, `docs/reverse-en
   (ReShade 6.8 `dxgi.dll`, EDHM/3DMigoto `d3d11.dll`, RenoDX-Add-on, EDAA.addon64, Streamline-DLLs).
 - Journal: `C:\Users\Gerri\Saved Games\Frontier Developments\Elite Dangerous`.
 - Grafik-Optionen: `%LOCALAPPDATA%\Frontier Developments\Elite Dangerous\Options\Graphics`
-  (`Settings.xml`: TerrainCheckerboardRenderingEnabled=false, Supersampling 1.0).
+  (`Settings.xml`: TerrainCheckerboardRenderingEnabled=false; Supersampling steht in
+  `Graphics\Custom.4.4.fxcfg` → `SSAAMultiplier` 1.0).
 - Controller: Manba One im PC-Modus **über Steam Input → Steam-Overlay muss an bleiben**.
 - Läuft außerdem: RivaTuner (RTSSHooks64), NVIDIA-Overlay.
 - `ReShade.ini`-Werte `[EDAA]` sind Nutzer-Einstellungen (im Overlay änderbar): **vor jeder

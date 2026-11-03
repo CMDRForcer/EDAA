@@ -37,6 +37,11 @@ Stand: 03.11.2026 – Planung abgeschlossen (mit Gerrit durchgegangen).
 - Test-Schlüssel aufräumen: `fg_present_test`/`fg_factory` → ein Schalter; Diagnose begrenzen.
 - Carrier-Sprung prüfen („EDAA status: …“-Zeilen im Log).
 - Release-Notizen: bekannte Fallen (Supersampling, Checkerboard, RTSS).
+- Zwei ReShade-Laufzeiten mit FG (D3D11 = `ReShade.ini`, D3D12-FG-Fenster = `ReShade2.ini`):
+  nach „Neu laden“ im Overlay „Failed to create graphics pipeline“ für alle Techniken (03.11.).
+  Vermutung: das sichtbare Overlay gehört zur D3D12-Laufzeit. Übergangslösung im Tool:
+  `ReShade2.ini` mit leerem Preset `GenFrame_FGFenster.ini`. Dauerhaft im Add-on lösen
+  (Overlay der D3D11-Laufzeit zeigen bzw. D3D12-Laufzeit ohne Effekte/Overlay).
 
 ## Phase 0 – Projekt aufsetzen (nach Phase 1)
 1. Gerrit legt privates, leeres Repo `CMDRForcer/gen-frame` an (Weboberfläche).
@@ -72,7 +77,7 @@ Die letzte Wahl bleibt gespeichert.
 
 Erste Tool-Version mit allen vier Funktionen:
 1. **Installation + Wiederherstellung:** ReShade (Add-on-Version) von reshade.me laden,
-   GEN·FRAME + Streamline-DLLs installieren, Backups (`ReShade.ini`, Preset, `Settings.xml`),
+   GEN·FRAME + Streamline-DLLs installieren, Backups (`ReShade.ini`, Preset, Grafikdateien inkl. `Custom.4.4.fxcfg`),
    Deinstallation/Zurücksetzen. EDHM/3DMigoto (`d3d11.dll`) und RenoDX nie anfassen.
 2. **Filter-Set:** nur die benötigten Shader aus den **Original-Quellen** laden (nicht
    mitliefern), Preset-Varianten einspielen, `SkipLoadingDisabledEffects=1`.
