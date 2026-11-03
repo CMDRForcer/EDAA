@@ -25,14 +25,17 @@ Stand: 03.11.2026 – Planung abgeschlossen (mit Gerrit durchgegangen).
   `gen-frame` unter `tool/`, gemeinsame Releases, CI baut es nur bei Änderungen in `tool/`.
 - **Bild:** SDR mit kuratiertem Filter-Set in drei Varianten, **keine Fake-HDR-Filter**.
   Echtes HDR später (Phase 3).
+- **Standardwerte** (Tool und neue Installationen; Nutzer kann sie im Overlay ändern):
+  `aa_method=1` (DLAA), `dlss_preset=11` (Transformer-Modell K), `taa_before_hud=1` und
+  `fg_hud_protect=1` (voller FG-HUD-Schutz). Neben dem Schalter „Resolve before the HUD pass“
+  ein kurzer Erklärtext: an = FG-HUD-Schutz voll, HUD aber nicht geglättet (Treppenstufen an
+  schrägen Linien); aus = HUD geglättet, FG-HUD-Schutz schwächer.
 
 ## Phase 1 – Stabil machen (im Fork)
 - Steam-Overlay-Fix (serialisierte Presents, Commit 1a8f6a2) über mehrere Abende bestätigen,
   dann nach `cmdr/stable` und Release `v0.5.3-cmdr1`.
 - Test-Schlüssel aufräumen: `fg_present_test`/`fg_factory` → ein Schalter; Diagnose begrenzen.
 - Carrier-Sprung prüfen („EDAA status: …“-Zeilen im Log).
-- Vergleichstests (Screenshots, Log, FPS): `taa_before_hud` 0 vs. 1, `dlss_preset` 10 vs. 11 (K).
-  Gerrits ini stand am 03.11. auf 0 / 10, Grund unbekannt. Besserer Wert wird Standard.
 - Release-Notizen: bekannte Fallen (Supersampling, Checkerboard, RTSS).
 
 ## Phase 0 – Projekt aufsetzen (nach Phase 1)

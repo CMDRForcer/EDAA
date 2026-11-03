@@ -52,11 +52,11 @@ Originale EDAA-Doku: `docs/addon.md`, `docs/motion-vectors.md`, `docs/reverse-en
   (`Settings.xml`: TerrainCheckerboardRenderingEnabled=false, Supersampling 1.0).
 - Controller: Manba One im PC-Modus **über Steam Input → Steam-Overlay muss an bleiben**.
 - Läuft außerdem: RivaTuner (RTSSHooks64), NVIDIA-Overlay.
-- Wichtige `ReShade.ini`-Werte `[EDAA]` (Stand 03.11.): `aa_method=1` (DLAA), `dlss_preset=10`,
-  `taa_before_hud=0`, `fg_present_test=1`, `fg_generate=1`, `fg_factory=1`,
-  `fg_fps_limit=140`, `fg_hud_protect=1`. Früher dokumentiert waren `dlss_preset=11` (K) und
-  `taa_before_hud=1`; Grund der Änderung unbekannt – beide Varianten werden verglichen
-  (Phase 1). Mit `taa_before_hud=0` wirkt der FG-HUD-Schutz nicht voll.
+- `ReShade.ini`-Werte `[EDAA]` sind Nutzer-Einstellungen (im Overlay änderbar): **vor jeder
+  Log-Auswertung die echte ini im Spielordner lesen**, nicht von hier ausgehen.
+  Gewünschter Stand: `aa_method=1` (DLAA), `dlss_preset=11` (K; 10 = J, 12 = L, 13 = M),
+  `taa_before_hud=1` + `fg_hud_protect=1` (voller FG-HUD-Schutz), `fg_present_test=1`,
+  `fg_generate=1`, `fg_factory=1`, `fg_fps_limit=140`.
 - Aktives ReShade-Preset: `ReshadePreset_ED_SLim.ini` (LSAO, Cinetools LUT, LocalContrastCS,
   CAS 1.0, Vibrance, PPFX Bloom, sdr_trc_fix); RenoDX-Add-on deaktiviert;
   `SkipLoadingDisabledEffects=0` bei ~200 installierten Shadern.
