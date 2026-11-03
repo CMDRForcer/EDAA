@@ -13,7 +13,8 @@ Fork von **EDAA** (Siegfried-Origin/EDAA, MIT-Lizenz): ein ReShade-Add-on für E
 Odyssey (DX11) mit TAA, NVIDIA DLAA und Intel XeSS, eingesetzt *vor* dem Cockpit-HUD.
 In diesem Fork kam **echtes DLSS Frame Generation (DLSS-G 2x)** dazu, über eine eigene
 D3D12-Bildausgabe und NVIDIA Streamline. Ziel: ein **eigenes Projekt** daraus machen
-(Arbeitstitel GEN·FRAME), zuerst für Elite, später erweiterbar – siehe `docs/plan.md`.
+(**GEN·FRAME**, privates Repo `gen-frame` nach Phase 1), zuerst für Elite, später erweiterbar,
+mit eigenem Einrichtungs-Programm und Filter-Set – Entscheidungen in `docs/plan.md`.
 
 Technische Details, Fehlerhistorie und Log-Meldungen: `docs/fg-notes.md`.
 Originale EDAA-Doku: `docs/addon.md`, `docs/motion-vectors.md`, `docs/reverse-engineering.md`.
@@ -23,7 +24,8 @@ Originale EDAA-Doku: `docs/addon.md`, `docs/motion-vectors.md`, `docs/reverse-en
 - `cmdr/stable` – Gerrits feste Version, aus ihr werden Releases gebaut (Pre-Releases `vX.Y.Z-cmdr1`).
 - `builds/<branch>` – von der CI veröffentlichte Builds (nur Binärdateien, nie als Target wählen).
 - `master` – unverändertes Upstream-EDAA.
-- Upstream: https://github.com/Siegfried-Origin/EDAA (Issue mit FG-Vorschlag geplant/gestellt).
+- Upstream: https://github.com/Siegfried-Origin/EDAA (FG-Vorschlag: Issue #6, Stand 03.11. ohne
+  Antwort von Siegfried; GEN·FRAME wartet nicht darauf).
 
 ## Build
 - Lokal nur unter Windows (VS 2022, CMake, fxc). In Cloud-Sitzungen **nicht lokal bauen** –
@@ -50,9 +52,14 @@ Originale EDAA-Doku: `docs/addon.md`, `docs/motion-vectors.md`, `docs/reverse-en
   (`Settings.xml`: TerrainCheckerboardRenderingEnabled=false, Supersampling 1.0).
 - Controller: Manba One im PC-Modus **über Steam Input → Steam-Overlay muss an bleiben**.
 - Läuft außerdem: RivaTuner (RTSSHooks64), NVIDIA-Overlay.
-- Wichtige `ReShade.ini`-Werte `[EDAA]`: `aa_method=1` (DLAA), `dlss_preset=11` (K),
-  `taa_before_hud=1`, `fg_present_test=1`, `fg_generate=1`, `fg_factory=1`,
-  `fg_fps_limit=140`, `fg_hud_protect=1`.
+- Wichtige `ReShade.ini`-Werte `[EDAA]` (Stand 03.11.): `aa_method=1` (DLAA), `dlss_preset=10`,
+  `taa_before_hud=0`, `fg_present_test=1`, `fg_generate=1`, `fg_factory=1`,
+  `fg_fps_limit=140`, `fg_hud_protect=1`. Früher dokumentiert waren `dlss_preset=11` (K) und
+  `taa_before_hud=1`; Grund der Änderung unbekannt – beide Varianten werden verglichen
+  (Phase 1). Mit `taa_before_hud=0` wirkt der FG-HUD-Schutz nicht voll.
+- Aktives ReShade-Preset: `ReshadePreset_ED_SLim.ini` (LSAO, Cinetools LUT, LocalContrastCS,
+  CAS 1.0, Vibrance, PPFX Bloom, sdr_trc_fix); RenoDX-Add-on deaktiviert;
+  `SkipLoadingDisabledEffects=0` bei ~200 installierten Shadern.
 - Tests: Gerrit spielt, Claude liest danach `ReShade.log`, `sl.log`, Journal und – bei Abstürzen –
   den Elite-MiniDump (`*_MiniDump.dmp`, Gerrit lädt ihn hoch; Analyse mit Python `minidump`).
   Dateien im Spielordner nur austauschen, wenn Elite **geschlossen** ist (Journal endet mit
