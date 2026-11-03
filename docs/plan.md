@@ -81,7 +81,9 @@ Erste Tool-Version mit allen vier Funktionen:
    GEN·FRAME + Streamline-DLLs installieren, Backups (`ReShade.ini`, Preset, Grafikdateien inkl. `Custom.4.4.fxcfg`),
    Deinstallation/Zurücksetzen. EDHM/3DMigoto (`d3d11.dll`) und RenoDX nie anfassen.
 2. **Filter-Set:** nur die benötigten Shader aus den **Original-Quellen** laden (nicht
-   mitliefern), Preset-Varianten einspielen, `SkipLoadingDisabledEffects=1`.
+   mitliefern); vorhandene Presets nie überschreiben (Knopf „Startwerte“ je Variante),
+   Tiefen-Definitionen setzen, wenn sie fehlen; Preset-Varianten einspielen, `SkipLoadingDisabledEffects=0` (nur die 11 Set-Effekte
+   installiert; so sind optionale sofort anhakbar und die Reihenfolge bleibt).
 3. **Elite-Check:** Supersampling ≠ 1.0, Checkerboard an, RTSS-/Doppel-Limiter, doppelte
    Schärfe (NVIDIA-Treiber/App), alte Test-Builds im Spielordner erkennen und korrigieren.
 4. **Diagnose + Einstellungen:** Diagnose-Zip per Klick (ReShade.log, sl.log, Dumps,
@@ -108,21 +110,26 @@ Reihenfolge = Ausführungsreihenfolge. Startwerte sind Ausgangspunkte.
 | 2 | Farbe | `PD80_02_Cinetools_LUT` (prod80) | 30–50 % | Stimmung, EDHM-HUD nicht verfälschen |
 | 3 | Klarheit | `LocalContrastCS` | 0.30–0.40 | Tiefe in Cockpit, Station, Planeten |
 | 4 | Vibrance | `Vibrance.fx` | 0.10–0.15 | kräftigere Farben |
-| 5 | Schärfe | `CAS.fx` (AMD) | 0.30–0.50 | Detail nach DLAA, immer zuletzt |
+| 5 | Schärfe | `CAS.fx` (AMD) | 0.40 | Detail nach DLAA, letzter Bild-Filter |
+| 6 | Schwarzwert | `lilium__sdr_trc_fix` (Lilium, GPL-3) | Gamma 2.2 → sRGB | Weltraum schwarz statt grau |
 
 Varianten:
-- **Natürlich:** 1 + 5
-- **Lebendig:** 1–5 (Standard)
+- **Natürlich:** 1 + 5 + 6
+- **Lebendig:** 1–6 (Standard)
 - **Leistung:** nur 5
 
-Nicht im Set: ReShade-AO (Elite hat eigene; teuer, wirkt aufs HUD), zusätzlicher Bloom
-(HUD-Glühen, vermutlich FG-Schlieren am HUD-Rand), Fake-HDR, Film Grain, Tiefenunschärfe,
-Motion Blur, Lens Dirt.
+Optional, installiert, im Preset **aus** (im Overlay anhakbar, kostet bis dahin nichts):
+MXAO (qUINT, vor 1), Fake-HDR (SweetFX `FakeHDR.fx`), Bloom (qUINT, vor 5), Tiefenunschärfe
+(qUINT ADOF, vor 5), Film Grain (SweetFX, nach 5). AO und Tiefenunschärfe brauchen den Tiefenpuffer: nur
+ohne FG, HUD prüfen. Lumenite LSAO nicht (Repo 404, Lizenz unklar). Nicht dabei: Motion Blur,
+Lens Dirt.
 
 Offen:
 - Vergleichstest jeder Variante gegen Gerrits Preset `ReshadePreset_ED_SLim.ini`
   (gleiche Orte: Station, Planet, Nebel, Supercruise; Screenshots + FPS, mit FG und HUD).
-- Lizenz jeder Shader-Quelle prüfen (Download durch das Tool erlaubt?) – vor dem Tool-Bau.
+- Lizenz jeder Shader-Quelle prüfen (Download durch das Tool erlaubt?). qUINT ist „All rights
+  reserved“: nur von der Original-Adresse laden, nie mitliefern.
+- Schwarzwert-Fix im Weltraum gegen „aus“ vergleichen (Schatten nicht zulaufen lassen).
 - Optional später: `GraphicsConfigurationOverride.xml`-Feintuning (Sterne, Nebel, Schatten).
 
 ## Phase 3 – Funktionen

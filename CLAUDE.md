@@ -44,7 +44,8 @@ Originale EDAA-Doku: `docs/addon.md`, `docs/motion-vectors.md`, `docs/reverse-en
 ## Gerrits System (zum Testen)
 - RTX 4070 Ti (12 GB), i7-14700KF, 32 GB, Samsung Odyssey G5 1440p/144 Hz G-Sync, HAGS an.
 - NVIDIA-Treiber 617.42, NVIDIA App mit DLSS-Override: **Super Resolution Preset K,
-  Frame Generation Preset C** (im sl.log bestätigt: „ModelPreset, Value: 3 … Applied: Yes“).
+  Frame Generation Preset B** (seit 03.11., im sl.log: „ModelPreset, Value: 2 … Applied: Yes“;
+  vorher C = Value 3).
 - Spielordner: `E:\Steam\steamapps\common\Elite Dangerous\Products\elite-dangerous-odyssey-64`
   (ReShade 6.8 `dxgi.dll`, EDHM/3DMigoto `d3d11.dll`, RenoDX-Add-on, EDAA.addon64, Streamline-DLLs).
 - Journal: `C:\Users\Gerri\Saved Games\Frontier Developments\Elite Dangerous`.
@@ -58,9 +59,14 @@ Originale EDAA-Doku: `docs/addon.md`, `docs/motion-vectors.md`, `docs/reverse-en
   Gewünschter Stand: `aa_method=1` (DLAA), `dlss_preset=11` (K; 10 = J, 12 = L, 13 = M),
   `taa_before_hud=1` + `fg_hud_protect=1` (voller FG-HUD-Schutz), `fg_present_test=1`,
   `fg_generate=1`, `fg_factory=1`, `fg_fps_limit=140`.
-- Aktives ReShade-Preset: `ReshadePreset_ED_SLim.ini` (LSAO, Cinetools LUT, LocalContrastCS,
-  CAS 1.0, Vibrance, PPFX Bloom, sdr_trc_fix); RenoDX-Add-on deaktiviert;
-  `SkipLoadingDisabledEffects=0` bei ~200 installierten Shadern.
+- Seit 03.11. sauber mit GenFrameSetup installiert (alte Dateien in
+  `%LOCALAPPDATA%\GenFrame\Entfernt\`). Aktives Preset: `GenFrame_Lebendig.ini`, nur die 11
+  Set-Shader installiert, `SkipLoadingDisabledEffects=0`; FG-Fenster: `ReShade2.ini` mit leerem
+  `GenFrame_FGFenster.ini`. Gerrits Stand: Deband, Vibrance, Fake-HDR, CAS, Schwarzwert-Fix an;
+  LUT/LocalContrast selbst ausgeschaltet; MXAO/qUINT-Bloom aus (Elite hat eigene AO/Bloom).
+  RenoDX-Add-on deaktiviert.
+- Grafik-Override: Galaxie-Hintergrund 8192, Envmap 512 (03.11.); `EnvmapQuality` 1 ist
+  schon die höchste Stufe.
 - Tests: Gerrit spielt, Claude liest danach `ReShade.log`, `sl.log`, Journal und – bei Abstürzen –
   den Elite-MiniDump (`*_MiniDump.dmp`, Gerrit lädt ihn hoch; Analyse mit Python `minidump`).
   Dateien im Spielordner nur austauschen, wenn Elite **geschlossen** ist (Journal endet mit
