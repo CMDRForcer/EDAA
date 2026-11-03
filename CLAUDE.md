@@ -70,5 +70,7 @@ Originale EDAA-Doku: `docs/addon.md`, `docs/motion-vectors.md`, `docs/reverse-en
 - Die Grafikkarte darf nie auf die andere API warten (keine GPU-seitigen D3D11↔D3D12-Waits).
 - Zwei Bildausgaben im Prozess: Presents nie gleichzeitig (Steam-Overlay-Hook ist nicht threadsicher).
 - DLSS-G nicht unnötig aus-/einschalten (Neuaufbau = Ruckler).
-- Nichts in fremde Treiberprofile/Registry schreiben (z. B. kein NVAPI-DRS für FG-Presets).
+- Das **Add-on** schreibt nie in Treiberprofile/Registry. Einzige Ausnahme ist der
+  Preset-Unlocker im **Einrichtungs-Programm**: nur das Elite-Profil, nur DLSS-/FG-Preset-Einträge,
+  vorher Backup, Wiederherstellen-Knopf, nur auf Knopfdruck des Nutzers.
 - Ehrlich bleiben: Vermutungen als Vermutungen kennzeichnen, Ergebnisse mit Log belegen.

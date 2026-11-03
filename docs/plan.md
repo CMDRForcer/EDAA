@@ -57,6 +57,19 @@ Stand: 03.11.2026 – Planung abgeschlossen (mit Gerrit durchgegangen).
 Schnittstelle: Profil liefert pro Frame Tiefe, Bewegungsvektoren, Kamera, HUD-Info, Resolve-Zeitpunkt.
 
 ## Einrichtungs-Programm (`tool/`, eigenes Teilprojekt nach der ersten Version)
+Ziel: **Knopf drücken, konfigurieren, spielen** – alles über das Tool, ohne NVIDIA App,
+Profile Inspector oder Handarbeit in ini-Dateien.
+
+**Schnellwahl** (ein Klick, setzt alle nötigen Werte):
+- DLAA + FG
+- nur DLAA
+- nur FG (Kantenglättung mit TAA) – prüfen, ob FG ohne DLAA sauber läuft
+- aus (Spiel ohne Kantenglättung und FG; ReShade-Filter bleiben)
+
+Der Nutzer entscheidet frei: Kantenglättung (DLAA/TAA/XeSS/aus), FG an/aus, Presets und
+Filter-Variante lassen sich unabhängig kombinieren; die Schnellwahl ist nur eine Abkürzung.
+Die letzte Wahl bleibt gespeichert.
+
 Erste Tool-Version mit allen vier Funktionen:
 1. **Installation + Wiederherstellung:** ReShade (Add-on-Version) von reshade.me laden,
    GEN·FRAME + Streamline-DLLs installieren, Backups (`ReShade.ini`, Preset, `Settings.xml`),
@@ -67,6 +80,16 @@ Erste Tool-Version mit allen vier Funktionen:
    Schärfe (NVIDIA-Treiber/App), alte Test-Builds im Spielordner erkennen und korrigieren.
 4. **Diagnose + Einstellungen:** Diagnose-Zip per Klick (ReShade.log, sl.log, Dumps,
    Einstellungen), GEN·FRAME-Einstellungen bei geschlossenem Spiel bearbeiten.
+5. **Preset-Unlocker:** DLSS-Override für Elite im NVIDIA-Treiberprofil freischalten und
+   Presets für DLAA (z. B. K) und FG (z. B. C oder neuestes) direkt im Tool wählen – ersetzt
+   NVIDIA App/Profile Inspector. Bedingungen: nur das Elite-Profil, nur die DLSS-/FG-Preset-
+   Einträge, vorher Backup, „Wiederherstellen“-Knopf, nur auf Knopfdruck; nach Treiber-Updates
+   erkennen, ob die Werte weg sind, und „Erneut anwenden“ anbieten.
+   Vor dem Bau recherchieren: genaue DRS-Einträge (NVAPI) und ob Administratorrechte nötig sind.
+6. **Preset-Anzeige:** im Elite-Check aus `sl.log` zeigen, welche Presets wirklich aktiv sind
+   (`Override Reported: ModelPreset … Applied`) und ob es die neuesten sind (`Is Latest`).
+   Stand 02.11.: DLAA K (neuestes), FG C (nicht neuestes).
+
 Spielordner über Steam und Epic finden. Dateien nur bei geschlossenem Spiel ändern.
 
 ## Filter-Set (SDR) – Vorschlag, noch zu testen
@@ -101,6 +124,7 @@ Offen:
   `DLSSGFlags::eRetainResourcesWhenOff`). Dynamic MFG gibt es nur auf RTX 50.
 - HUD-Kantenglättung nur auf HUD-Pixeln (Treppenstufen an schrägen HUD-Linien bei taa_before_hud=1).
 - FG-Preset-Auswahl im Overlay, sobald Streamline/DLSS-SDK es anbieten (Stand 2.14.16/310.9.16: nein).
+  Bis dahin übernimmt das Tool die Preset-Wahl über das Treiberprofil (Preset-Unlocker).
 - **HDR im FG-Pfad:** geteilte Textur, D3D12-Swapchain, Farbraum und DLSS-G auf HDR umstellen,
   damit RenoDX (echtes HDR) mit FG läuft; Tool richtet RenoDX dann optional mit ein.
   Lohnt sich erst mit HDR-tauglichem Monitor (OLED/Mini-LED).
