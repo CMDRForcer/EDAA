@@ -33,6 +33,7 @@
 | An/Aus-Ruckler nach dem Fix | Übersprungene Eingaben zählten als „keine Szene“ | getrennte Zähler, 8-ms-CPU-Wait |
 | ~2,5 % übersprungene Bilder | Ein Eingabesatz, Freigabe erst nach Present | doppelte Puffer, Freigabe nach Command-List |
 | Absturz in `gameoverlayrenderer64.dll+0x9c130` (Lesezugriff 0xFFFF…) | DLSS-G präsentiert vom eigenen Pacer-Thread, gleichzeitig Elite vom Render-Thread → Steam-Overlay-Hook nicht threadsicher | Presents serialisiert (timed_mutex, `present`/`finish_present`) – in Bestätigung |
+| Bild und Eingaben eingefroren nach „Reset to defaults“ oder „Present through D3D11 again…“ bei laufender FG (Ereignis 1002) | `fg_present_test=0` stoppte die D3D12-Ausgabe sofort, das Kindfenster blieb mit dem letzten Bild über dem Spiel, DLSS-G blieb an | Ausgabe läuft bis Spielende weiter, DLSS-G geht über den erprobten Aus-Pfad aus; D3D11 erst beim nächsten Start – in Bestätigung |
 
 Nicht geholfen: Umgebungsvariable `SteamNoOverlayUIDrawing=1` (Steam Input braucht das Overlay ohnehin).
 
